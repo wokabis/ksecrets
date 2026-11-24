@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "types": ["node", "@cloudflare/workers-types"]
+  },
+  "include": ["src/**/*", "wrangler.toml"],
+  "exclude": ["node_modules", "dist"]
+}

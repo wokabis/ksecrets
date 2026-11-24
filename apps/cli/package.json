@@ -1,0 +1,29 @@
+{
+  "name": "@pwpush/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "pwpush": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@pwpush/types": "workspace:*",
+    "@pwpush/crypto": "workspace:*",
+    "commander": "^12.1.0",
+    "chalk": "^5.3.0",
+    "ora": "^8.0.1",
+    "conf": "^13.0.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0",
+    "tsx": "^4.16.0"
+  }
+}
