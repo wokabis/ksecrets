@@ -1,15 +1,23 @@
 {
-  "name": "@pwpush/crypto",
+  "name": "@ksecrets/crypto",
   "version": "0.1.0",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "browser": "./src/browser.ts",
+      "default": "./src/index.ts"
+    },
+    "./browser": "./src/browser.ts"
+  },
   "scripts": {
     "build": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "eslint src --ext .ts"
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@pwpush/types": "workspace:*",
+    "@ksecrets/types": "workspace:*",
     "@noble/hashes": "^1.4.0"
   },
   "devDependencies": {

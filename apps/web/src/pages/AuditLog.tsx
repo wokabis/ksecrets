@@ -1,7 +1,8 @@
+import { api } from "../lib/api";
 import { useState, useEffect } from "react";
 import { Search, Filter, Download, ChevronLeft, ChevronRight, Calendar, Clock, User, MapPin, AlertCircle } from "lucide-react";
 import { clsx } from "clsx";
-import { AuditLogQuerySchema, type AuditLogEntry } from "@pwpush/types";
+import { AuditLogQuerySchema, type AuditLogEntry } from "@ksecrets/types";
 
 const ACTION_LABELS: Record<string, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
   created: { label: "Created", icon: User, color: "text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30" },
@@ -38,7 +39,7 @@ export function AuditLog() {
       if (filters.fromDate) params.set("fromDate", filters.fromDate);
       if (filters.toDate) params.set("toDate", filters.toDate);
 
-      const res = await fetch(`/api/v2/audit?${params}`, { credentials: "include" });
+      const res = await api(`/api/v2/audit?${params}`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setLogs(data.items);
@@ -65,7 +66,7 @@ export function AuditLog() {
       ...(filters.toDate && { toDate: filters.toDate }),
     });
 
-    const res = await fetch(`/api/v2/audit?${params}`, { credentials: "include" });
+    const res = await api(`/api/v2/audit?${params}`, { credentials: "include" });
     if (res.ok) {
       const data = await res.json();
       const csv = [
@@ -80,7 +81,7 @@ export function AuditLog() {
           JSON.stringify(item.metadata),
           item.createdAt,
         ]),
-      ].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+      ].map((row) => row.map((cell: unknown) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
 
       const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
@@ -172,39 +173,41 @@ export function AuditLog() {
                   </td>
                 </tr>
               ) : (
-                logs.map((log) => {
-                  const actionInfo = ACTION_LABELS[log.action] || { label: log.action, icon: AlertCircle, color: "text-gray-600 bg-gray-100" });
-                  const Icon = actionInfo.icon;
-                  return (
-                    <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-white font-mono">
-                        {new Date(log.createdAt).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={clsx("inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium", actionInfo.color)}>
-                          <Icon className="h-3 w-3" aria-hidden="true" />
-                          {actionInfo.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 font-mono">
-                        <a href={`/v/${log.pushId}`} className="hover:text-primary-600 dark:hover:text-primary-400">
-                          {log.pushId.slice(0, 8)}...
-                        </a>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 font-mono">
-                        {log.ip || "—"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">
-                        {log.userAgent || "—"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                        {log.retrieverEmail || "—"}
-                      </td>
-                    </tr>
-                  );
-                })
+                <>
+                  {logs.map((log) => {
+                    const actionInfo = ACTION_LABELS[log.action] || { label: log.action, icon: AlertCircle, color: "text-gray-600 bg-gray-100" };
+                    const Icon = actionInfo.icon;
+                    return (
+                      <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-white font-mono">
+                          {new Date(log.createdAt).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={clsx("inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium", actionInfo.color)}>
+                            <Icon className="h-3 w-3" aria-hidden="true" />
+                            {actionInfo.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 font-mono">
+                          <a href={`/v/${log.pushId}`} className="hover:text-primary-600 dark:hover:text-primary-400">
+                            {log.pushId.slice(0, 8)}...
+                          </a>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 font-mono">
+                          {log.ip || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">
+                          {log.userAgent || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                          {log.retrieverEmail || "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </>
               )}
-            </tbody>
+              </tbody>
           </table>
         </div>
 

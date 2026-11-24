@@ -106,7 +106,7 @@ export function Home() {
               Trusted by <span className="text-primary-600 dark:text-primary-400">Teams Worldwide</span>
             </h2>
             <p className="mt-4 text-lg text-gray-600 dark:text-gray-300">
-              From startups to enterprises, teams rely on Password Pusher for secure credential sharing.
+              From startups to enterprises, teams rely on KSecrets for secure credential sharing.
             </p>
           </div>
 

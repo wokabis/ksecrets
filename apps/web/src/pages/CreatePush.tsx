@@ -1,14 +1,16 @@
+import { api } from "../lib/api";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Shield, Key, FileText, Globe, Eye, Clock, Copy, Check, AlertCircle, Loader2 } from "lucide-react";
 import { clsx } from "clsx";
-import { CreatePushSchema, type PushKind, type CreatePushInput } from "@pwpush/types";
-import { encrypt, serializationResult } from "@pwpush/crypto";
+import { CreatePushSchema, type PushKind, type CreatePushInput } from "@ksecrets/types";
+import { encryptWithMasterKey, serializationResult } from "@ksecrets/crypto/browser";
+import { generatePushKey, fromBase64Url } from "../lib/pushKey";
 
 const KINDS: { value: PushKind; label: string; description: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: "password", label: "Password", description: "Share a password or secret text", icon: Key },
   { value: "note", label: "Secure Note", description: "Share a longer text note or message", icon: FileText },
-  { { value: "url", label: "URL / Link", description: "Share a private URL with tracking", icon: Globe },
+  { value: "url", label: "URL / Link", description: "Share a private URL with tracking", icon: Globe },
   { value: "file", label: "File", description: "Upload and share a file securely", icon: FileText },
 ];
 
@@ -35,15 +37,44 @@ export function CreatePush() {
     setSubmitting(true);
 
     try {
+      if (kind === "file") {
+        if (!file) {
+          setError("Please select a file to upload.");
+          setSubmitting(false);
+          return;
+        }
+        const form = new FormData();
+        form.append("file", file);
+        if (passphrase) form.append("passphrase", passphrase);
+        if (expiryViews) form.append("expiryViews", expiryViews);
+        if (expiryDays) form.append("expiryDays", expiryDays);
+        if (note) form.append("note", note);
+        if (retrieverEmail) form.append("retrieverEmail", retrieverEmail);
+
+        const fileRes = await api("/api/v2/files", {
+          method: "POST",
+          credentials: "include",
+          body: form,
+        });
+        const fileData = await fileRes.json();
+        if (!fileRes.ok) {
+          setError(fileData.error?.message || "Failed to upload file");
+          setSubmitting(false);
+          return;
+        }
+        setSuccess({ id: fileData.id, url: fileData.url, secretUrl: fileData.secretUrl });
+        return;
+      }
+
       const input: CreatePushInput = {
         kind,
-        payload: kind === "file" && file ? await fileToBase64(file) : payload,
+        payload,
         passphrase: passphrase || undefined,
         expiryViews: expiryViews ? parseInt(expiryViews) : undefined,
         expiryDays: expiryDays ? parseInt(expiryDays) : undefined,
-        filename: filename || (file?.name || undefined),
-        contentType: file?.type || undefined,
-        size: file?.size || undefined,
+        filename: filename || undefined,
+        contentType: undefined,
+        size: undefined,
         note: note || undefined,
         retrieverEmail: retrieverEmail || undefined,
       };
@@ -55,18 +86,12 @@ export function CreatePush() {
         return;
       }
 
-      const masterKeyHex = import.meta.env.VITE_MASTER_KEY || "";
-      if (!masterKeyHex) {
-        setError("Encryption key not configured. Please contact administrator.");
-        setSubmitting(false);
-        return;
-      }
-
-      const masterKey = new Uint8Array(Buffer.from(masterKeyHex, "hex"));
-      const result = await encrypt(parsed.data.payload, masterKey);
+      const keyFragment = generatePushKey();
+      const pushKey = fromBase64Url(keyFragment);
+      const result = await encryptWithMasterKey(parsed.data.payload, pushKey, "web");
       const encryptedPayload = serializationResult(result);
 
-      const res = await fetch("/api/v2/pushes", {
+      const res = await api("/api/v2/pushes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -84,7 +109,11 @@ export function CreatePush() {
         return;
       }
 
-      setSuccess({ id: data.id, url: data.url, secretUrl: data.secretUrl });
+      setSuccess({
+        id: data.id,
+        url: `${data.url}#k=${keyFragment}`,
+        secretUrl: `${data.secretUrl}#k=${keyFragment}`,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred");
     } finally {
@@ -96,15 +125,6 @@ export function CreatePush() {
     await navigator.clipboard.writeText(text);
     setCopied(type);
     setTimeout(() => setCopied(null), 2000);
-  };
-
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-    });
   };
 
   if (success) {

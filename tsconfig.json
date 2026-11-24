@@ -15,10 +15,10 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "@pwpush/types": ["packages/types/src"],
-      "@pwpush/crypto": ["packages/crypto/src"],
-      "@pwpush/db": ["packages/db/src"],
-      "@pwpush/auth": ["packages/auth/src"]
+      "@ksecrets/types": ["packages/types/src"],
+      "@ksecrets/crypto": ["packages/crypto/src"],
+      "@ksecrets/db": ["packages/db/src"],
+      "@ksecrets/auth": ["packages/auth/src"]
     }
   },
   "exclude": ["node_modules", "dist", "build", ".turbo"]

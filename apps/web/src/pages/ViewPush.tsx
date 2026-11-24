@@ -1,9 +1,12 @@
+import { api } from "../lib/api";
+import { hexToBytes } from "../lib/keys";
+import { keyFromFragment } from "../lib/pushKey";
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { Shield, Key, FileText, Globe, Eye, Clock, AlertCircle, Loader2, Check, Copy, Download, Info } from "lucide-react";
 import { clsx } from "clsx";
-import { ViewPushSchema, type ViewPushResponse } from "@pwpush/types";
-import { decrypt, deserializeResult } from "@pwpush/crypto";
+import { ViewPushSchema, type ViewPushResponse } from "@ksecrets/types";
+import { decryptWithMasterKey, deserializeResult } from "@ksecrets/crypto/browser";
 
 interface Props {
   secure?: boolean;
@@ -33,7 +36,7 @@ export function ViewPush({ secure = false }: Props) {
     setError(null);
 
     try {
-      const res = await fetch("/api/v2/pushes/" + id, {
+      const res = await api("/api/v2/pushes/" + id, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -61,6 +64,19 @@ export function ViewPush({ secure = false }: Props) {
         throw new Error(result.error?.message || "Failed to fetch push");
       }
 
+      const fragmentKey = keyFromFragment();
+      const legacyKeyHex = import.meta.env.VITE_MASTER_KEY || "";
+      const decryptionKey = fragmentKey ?? (legacyKeyHex ? hexToBytes(legacyKeyHex) : null);
+      if (decryptionKey && typeof result.payload === "string" && result.payload.startsWith("{\"c\":")) {
+        try {
+          const decrypted = await decryptWithMasterKey(deserializeResult(result.payload), decryptionKey, "web");
+          result.encryptedPayload = result.payload;
+          result.payload = new TextDecoder().decode(decrypted);
+        } catch {
+          // payload stays encrypted if the key does not match
+        }
+      }
+
       setData(result);
       setError(null);
       setVerifying(false);
@@ -86,16 +102,32 @@ export function ViewPush({ secure = false }: Props) {
   const downloadFile = async () => {
     if (!data || data.kind !== "file") return;
     try {
-      const masterKeyHex = import.meta.env.VITE_MASTER_KEY || "";
-      if (!masterKeyHex) throw new Error("Encryption key not configured");
+      const downloadUrl = (data as any).downloadUrl as string | undefined;
+      let blob: Blob;
 
-      const masterKey = new Uint8Array(Buffer.from(masterKeyHex, "hex"));
-      const encryptedPayload = (data as any).encryptedPayload;
-      if (!encryptedPayload) throw new Error("No encrypted payload");
+      if (downloadUrl) {
+        const res = await api(downloadUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ passphrase: passphrase || undefined }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error?.message || "Download failed");
+        }
+        blob = await res.blob();
+      } else {
+        const dataUrl = (data as any).payload as string | undefined;
+        if (!dataUrl) throw new Error("No file payload");
+        const match = /^data:([^;]+);base64,(.*)$/.exec(dataUrl);
+        const base64 = match ? match[2] : dataUrl;
+        const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+        blob = new Blob([bytes as any], {
+          type: data.contentType || match?.[1] || "application/octet-stream",
+        });
+      }
 
-      const result = deserializeResult(encryptedPayload);
-      const decrypted = await decrypt(result, masterKey);
-      const blob = new Blob([decrypted], { type: data.contentType || "application/octet-stream" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -105,7 +137,7 @@ export function ViewPush({ secure = false }: Props) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Download failed:", err);
+      setError(err instanceof Error ? err.message : "Download failed");
     }
   };
 
@@ -329,6 +361,7 @@ export function ViewPush({ secure = false }: Props) {
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {data.kind !== "file" && (
                   <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium text-gray-900 dark:text-white">Secret Content</span>
@@ -340,10 +373,11 @@ export function ViewPush({ secure = false }: Props) {
                         {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                       </button>
                     </div>
-                    <pre className="font-mono text-sm whitespace-pre-wrap break-all text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-900 p-4 rounded-lg max-h-64 overflow-y-auto">
+                    <pre className="font-mono text-sm whitespace-pre-wrap break-all text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-900 rounded-lg p-4 max-h-64 overflow-y-auto">
                       {(data as any).payload}
                     </pre>
                   </div>
+                  )}
                   {data.kind === "url" && (
                     <a
                       href={(data as any).payload}
@@ -375,7 +409,7 @@ export function ViewPush({ secure = false }: Props) {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Secure Preview</h2>
               <p className="mt-2 text-gray-600 dark:text-gray-300">Click below to access the secret. The sender will be notified of the view.</p>
               <button
-                onClick={() => navigate(`/s/${id}`)}
+                onClick={() => navigate(`/s/${id}${window.location.hash}`)}
                 className="mt-6 btn-primary"
               >
                 <Key className="mr-2 h-4 w-4" aria-hidden="true" />

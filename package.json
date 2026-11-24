@@ -1,5 +1,5 @@
 {
-  "name": "pwpush",
+  "name": "ksecrets",
   "version": "0.1.0",
   "private": true,
   "workspaces": [
@@ -14,8 +14,8 @@
     "db:generate": "turbo run db:generate",
     "db:migrate": "turbo run db:migrate",
     "db:seed": "turbo run db:seed",
-    "deploy:api": "turbo run deploy --filter=@pwpush/api",
-    "deploy:web": "turbo run deploy --filter=@pwpush/web",
+    "deploy:api": "turbo run deploy --filter=@ksecrets/api",
+    "deploy:web": "turbo run deploy --filter=@ksecrets/web",
     "deploy:all": "turbo run deploy"
   },
   "devDependencies": {

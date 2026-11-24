@@ -1,0 +1,8 @@
+# wrangler dev reads this file from the worker directory (apps/api/).
+# Copy to apps/api/.dev.vars and fill in real values. This file is gitignored.
+SECRET_KEY_BASE=your-secret-key-base-32-bytes-hex
+KSECRETS_MASTER_KEY=your-master-encryption-key-32-bytes-hex
+# WEB_URL=http://localhost:5173
+# CORS_ORIGINS=http://localhost:5173
+# RESEND_API_KEY=
+# EMAIL_FROM=KSecrets <onboarding@resend.dev>

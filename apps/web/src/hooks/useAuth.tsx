@@ -1,5 +1,6 @@
+import { api } from "../lib/api";
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import type { User } from "@pwpush/types";
+import type { User } from "@ksecrets/types";
 
 interface AuthContextType {
   user: User | null;
@@ -18,7 +19,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = async () => {
     try {
-      const res = await fetch("/api/v2/auth/me", {
+      const res = await api("/api/v2/auth/me", {
         credentials: "include",
       });
       if (res.ok) {
@@ -39,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string, mfaCode?: string) => {
-    const res = await fetch("/api/v2/auth/login", {
+    const res = await api("/api/v2/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -60,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (email: string, password: string, name?: string) => {
-    const res = await fetch("/api/v2/auth/register", {
+    const res = await api("/api/v2/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -76,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await fetch("/api/v2/auth/logout", {
+    await api("/api/v2/auth/logout", {
       method: "POST",
       credentials: "include",
     });

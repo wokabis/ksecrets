@@ -43,7 +43,7 @@ export function Login() {
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2 text-2xl font-bold text-primary-600 dark:text-primary-400">
             <Shield className="h-8 w-8" aria-hidden="true" />
-            Password Pusher
+            KSecrets
           </Link>
           <h1 className="mt-6 text-2xl font-bold text-gray-900 dark:text-white">Sign in</h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">Access your dashboard and manage pushes</p>

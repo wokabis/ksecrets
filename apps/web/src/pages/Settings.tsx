@@ -1,5 +1,6 @@
+import { api } from "../lib/api";
 import { useState, useEffect } from "react";
-import { Shield, Key, User, Bell, Moon, Save, Loader2, Check, QrCode, Download, Upload } from "lucide-react";
+import { Shield, Key, User, Bell, Moon, Save, Loader2, Check, QrCode, Download, Upload, Plus, Copy, Trash2 } from "lucide-react";
 import { clsx } from "clsx";
 import { useAuth } from "../hooks/useAuth";
 
@@ -21,6 +22,7 @@ export function Settings() {
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [mfaSecret, setMfaSecret] = useState("");
   const [mfaUri, setMfaUri] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
   const [theme, setTheme] = useState("cerulean");
   const [apiKeys, setApiKeys] = useState<Array<{ id: string; name: string; prefix: string; scopes: string[]; lastUsedAt: string | null; expiresAt: string | null }>>([]);
   const [newApiKeyName, setNewApiKeyName] = useState("");
@@ -37,7 +39,7 @@ export function Settings() {
 
   const fetchApiKeys = async () => {
     try {
-      const res = await fetch("/api/v2/auth/api-keys", { credentials: "include" });
+      const res = await api("/api/v2/auth/api-keys", { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setApiKeys(data.items || []);
@@ -50,7 +52,7 @@ export function Settings() {
   const handleSaveProfile = async () => {
     setSaving(true);
     try {
-      const res = await fetch("/api/v2/auth/profile", {
+      const res = await api("/api/v2/auth/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -79,7 +81,7 @@ export function Settings() {
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/v2/auth/password", {
+      const res = await api("/api/v2/auth/password", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -104,7 +106,7 @@ export function Settings() {
 
   const handleEnableMfa = async () => {
     try {
-      const res = await fetch("/api/v2/auth/mfa/enable", {
+      const res = await api("/api/v2/auth/mfa/enable", {
         method: "POST",
         credentials: "include",
       });
@@ -112,17 +114,37 @@ export function Settings() {
         const data = await res.json();
         setMfaSecret(data.secret);
         setMfaUri(data.uri);
-        setMfaEnabled(true);
       }
     } catch (err) {
       console.error("Failed to enable MFA:", err);
     }
   };
 
+  const handleVerifyMfa = async () => {
+    try {
+      const res = await api("/api/v2/auth/mfa/verify", {
+        method: "POST",
+        body: JSON.stringify({ code: mfaCode }),
+      });
+      if (res.ok) {
+        setMfaEnabled(true);
+        setMfaSecret("");
+        setMfaUri("");
+        setMfaCode("");
+        await refreshUser();
+      } else {
+        const data = await res.json();
+        alert(data.error?.message || "Invalid authenticator code");
+      }
+    } catch (err) {
+      console.error("Failed to verify MFA:", err);
+    }
+  };
+
   const handleDisableMfa = async () => {
     if (!confirm("Disable two-factor authentication?")) return;
     try {
-      const res = await fetch("/api/v2/auth/mfa/disable", {
+      const res = await api("/api/v2/auth/mfa/disable", {
         method: "POST",
         credentials: "include",
       });
@@ -130,6 +152,7 @@ export function Settings() {
         setMfaEnabled(false);
         setMfaSecret("");
         setMfaUri("");
+        await refreshUser();
       }
     } catch (err) {
       console.error("Failed to disable MFA:", err);
@@ -138,7 +161,7 @@ export function Settings() {
 
   const handleCreateApiKey = async () => {
     try {
-      const res = await fetch("/api/v2/auth/api-keys", {
+      const res = await api("/api/v2/auth/api-keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -158,7 +181,7 @@ export function Settings() {
   const handleRevokeApiKey = async (id: string) => {
     if (!confirm("Revoke this API key?")) return;
     try {
-      const res = await fetch(`/api/v2/auth/api-keys/${id}`, {
+      const res = await api(`/api/v2/auth/api-keys/${id}`, {
         method: "DELETE",
         credentials: "include",
       });
@@ -328,6 +351,24 @@ export function Settings() {
                         <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(mfaUri)}`} alt="MFA QR Code" className="mx-auto rounded-lg border border-blue-200 dark:border-blue-800" />
                       </div>
                     )}
+                    <div className="mt-4 flex gap-2">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={mfaCode}
+                        onChange={(e) => setMfaCode(e.target.value)}
+                        className="input flex-1 font-mono tracking-widest text-center"
+                        placeholder="123456"
+                        maxLength={6}
+                      />
+                      <button
+                        onClick={handleVerifyMfa}
+                        className="btn-primary"
+                        disabled={mfaCode.length !== 6}
+                      >
+                        Verify
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

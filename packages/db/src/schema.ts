@@ -4,6 +4,7 @@ export const schema = {
   pushes: sql`
     CREATE TABLE IF NOT EXISTS pushes (
       id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
       kind TEXT NOT NULL CHECK (kind IN ('password', 'note', 'file', 'url')),
       payload TEXT NOT NULL,
       passphrase_hash TEXT,
@@ -104,6 +105,7 @@ export const schema = {
 export type Schema = {
   pushes: {
     id: string;
+    user_id: string | null;
     kind: "password" | "note" | "file" | "url";
     payload: string;
     passphrase_hash: string | null;

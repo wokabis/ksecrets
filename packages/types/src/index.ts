@@ -53,6 +53,7 @@ export const ViewPushResponseSchema = z.object({
   id: z.string().uuid(),
   kind: PushKind,
   payload: z.string(),
+  downloadUrl: z.string().optional(),
   filename: z.string().nullable(),
   contentType: z.string().nullable(),
   size: z.number().int().nullable(),
@@ -110,7 +111,7 @@ export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 export const LoginSchema = z.object({
   email: z.string().email(),
   password: z.string(),
-  mfaCode: z.string().length(6).optional(),
+  mfaCode: z.string().min(6).max(16).optional(),
 });
 export type LoginInput = z.infer<typeof LoginSchema>;
 
@@ -135,7 +136,7 @@ export const CreateApiKeySchema = z.object({
 export type CreateApiKeyInput = z.infer<typeof CreateApiKeySchema>;
 
 export const SettingsSchema = z.object({
-  siteName: z.string().max(128).default("Password Pusher"),
+  siteName: z.string().max(128).default("KSecrets"),
   siteUrl: z.string().url(),
   theme: z.string().default("cerulean"),
   customCss: z.string().optional(),

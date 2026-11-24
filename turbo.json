@@ -1,6 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "pipeline": {
+  "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "build/**"]
@@ -30,5 +30,5 @@
       "cache": false
     }
   },
-  "globalEnv": ["NODE_ENV", "DATABASE_URL", "SECRET_KEY_BASE", "PWPUSH_MASTER_KEY"]
+  "globalEnv": ["NODE_ENV", "DATABASE_URL", "SECRET_KEY_BASE", "KSECRETS_MASTER_KEY"]
 }

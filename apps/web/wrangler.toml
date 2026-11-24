@@ -1,9 +1,9 @@
-name = "pwpush"
+name = "ksecrets"
 pages_build_output_dir = "dist"
 compatibility_date = "2024-11-01"
 
 [env.production]
-name = "pwpush-prod"
+name = "ksecrets-prod"
 
 [env.preview]
-name = "pwpush-preview"
+name = "ksecrets-preview"

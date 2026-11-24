@@ -1,19 +1,22 @@
-name = "pwpush-api"
+name = "ksecrets-api"
 main = "src/index.ts"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
 NODE_ENV = "production"
+ENVIRONMENT = "production"
+# WEB_URL = "https://ksecrets.example.com"
+# CORS_ORIGINS = "https://ksecrets.example.com"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "pwpush-db"
+database_name = "ksecrets-db"
 database_id = "your-database-id"
 
 [[r2_buckets]]
 binding = "FILES"
-bucket_name = "pwpush-files"
+bucket_name = "ksecrets-files"
 
 [[kv_namespaces]]
 binding = "RATE_LIMIT"

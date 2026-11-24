@@ -34,9 +34,9 @@ export function Layout() {
         <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8" aria-label="Main navigation">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-8">
-              <Link to="/" className="flex items-center gap-2 text-xl font-bold text-primary-600 dark:text-primary-400" aria-label="Password Pusher Home">
+              <Link to="/" className="flex items-center gap-2 text-xl font-bold text-primary-600 dark:text-primary-400" aria-label="KSecrets Home">
                 <Shield className="h-8 w-8" />
-                <span>Password Pusher</span>
+                <span>KSecrets</span>
               </Link>
 
               <div className="hidden md:flex md:gap-1">
@@ -193,7 +193,7 @@ export function Layout() {
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="grid gap-6 md:grid-cols-3">
             <div>
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Password Pusher</h3>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">KSecrets</h3>
               <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                 Securely share sensitive information with automatic expiration & deletion.
               </p>
@@ -217,7 +217,7 @@ export function Layout() {
           </div>
           <div className="mt-8 border-t border-gray-200 pt-6 dark:border-gray-700">
             <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-              © {new Date().getFullYear()} Password Pusher. Open source under Apache 2.0.
+              © {new Date().getFullYear()} KSecrets. Open source under Apache 2.0.
             </p>
           </div>
         </div>

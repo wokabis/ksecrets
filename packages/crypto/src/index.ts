@@ -2,14 +2,13 @@ import { subtle } from "node:crypto";
 import { randomBytes } from "node:crypto";
 import { createHash, createHmac } from "node:crypto";
 import { pbkdf2Sync } from "node:crypto";
-import { EncryptionResult, DecryptionInput } from "./types";
 
 const ALGORITHM = "AES-GCM";
 const KEY_LENGTH = 256;
 const IV_LENGTH = 12;
 const SALT_LENGTH = 32;
 const TAG_LENGTH = 16;
-const PBKDF2_ITERATIONS = 600_000;
+const PBKDF2_ITERATIONS = 100_000;
 const MASTER_KEY_LENGTH = 32;
 
 export interface EncryptionResult {
@@ -67,7 +66,7 @@ export async function deriveKeyFromMaster(
   masterKey: Uint8Array,
   context: string
 ): Promise<CryptoKey> {
-  const salt = new TextEncoder().encode(`pwpush-${context}`);
+  const salt = new TextEncoder().encode(`ksecrets-${context}`);
   const keyMaterial = await subtle.importKey(
     "raw",
     masterKey,
@@ -193,8 +192,16 @@ export async function verifyPassword(password: string, storedHash: string): Prom
   return hash.toString("hex") === hashHex;
 }
 
+export function sha256Hex(data: string): string {
+  return createHash("sha256").update(data).digest("hex");
+}
+
+export function hashApiKey(key: string): string {
+  return sha256Hex(key);
+}
+
 export async function generateApiKey(): Promise<{ key: string; hash: string; prefix: string }> {
-  const prefix = "pwp_";
+  const prefix = "ks_";
   const randomPart = randomBytes(24).toString("base64url");
   const key = `${prefix}${randomPart}`;
   const hash = createHash("sha256").update(key).digest("hex");

@@ -7,8 +7,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      "@pwpush/types": path.resolve(__dirname, "../../packages/types/src"),
-      "@pwpush/crypto": path.resolve(__dirname, "../../packages/crypto/src"),
+      "@ksecrets/types": path.resolve(__dirname, "../../packages/types/src"),
+      "@ksecrets/crypto": path.resolve(__dirname, "../../packages/crypto/src"),
     },
   },
   build: {
@@ -18,7 +18,6 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ["react", "react-dom", "react-router-dom"],
-          crypto: ["@pwpush/crypto"],
         },
       },
     },

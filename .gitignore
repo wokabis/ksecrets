@@ -44,3 +44,7 @@ coverage
 
 # CLI
 apps/cli/dist/index.js
+.dev.vars
+!.dev.vars.example
+.env
+data/

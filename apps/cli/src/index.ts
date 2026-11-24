@@ -4,20 +4,22 @@ import { program } from "commander";
 import chalk from "chalk";
 import ora from "ora";
 import Conf from "conf";
-import { CreatePushSchema, type CreatePushInput, type PushKind } from "@pwpush/types";
-import { encrypt, serializationResult } from "@pwpush/crypto";
-import { readFileSync } from "node:fs";
+import { CreatePushSchema, type CreatePushInput, type PushKind } from "@ksecrets/types";
+import { encryptWithMasterKey, decryptWithMasterKey, deserializeResult, serializationResult } from "@ksecrets/crypto";
+import { readFileSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const config = new Conf({ projectName: "pwpush-cli" });
+const config = new Conf({ projectName: "ksecrets-cli" });
 
 interface CliConfig {
   apiUrl?: string;
   apiKey?: string;
+  token?: string;
   masterKey?: string;
 }
 
@@ -31,14 +33,18 @@ function setConfig(key: keyof CliConfig, value: string) {
 
 async function apiRequest(endpoint: string, options: RequestInit = {}) {
   const cfg = getConfig();
-  const baseUrl = cfg.apiUrl || "https://api.pwpush.example.com";
+  const baseUrl = cfg.apiUrl || "https://api.ksecrets.example.com";
+  const isForm = typeof FormData !== "undefined" && options.body instanceof FormData;
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isForm ? {} : { "Content-Type": "application/json" }),
     ...options.headers as Record<string, string>,
   };
 
   if (cfg.apiKey) {
     headers["X-API-Key"] = cfg.apiKey;
+  }
+  if (cfg.token) {
+    headers["Authorization"] = `Bearer ${cfg.token}`;
   }
 
   const res = await fetch(`${baseUrl}${endpoint}`, {
@@ -55,8 +61,8 @@ async function apiRequest(endpoint: string, options: RequestInit = {}) {
 }
 
 program
-  .name("pwpush")
-  .description("Password Pusher CLI - Securely share secrets from your terminal")
+  .name("ksecrets")
+  .description("KSecrets CLI - Securely share secrets from your terminal")
   .version("0.1.0");
 
 program
@@ -70,7 +76,11 @@ program
     if (options.key) setConfig("apiKey", options.key);
     if (options.masterKey) setConfig("masterKey", options.masterKey);
     console.log(chalk.green("Configuration saved"));
-    console.log(chalk.gray(JSON.stringify(getConfig(), null, 2)));
+    const shown = { ...getConfig() };
+    if (shown.apiKey) shown.apiKey = shown.apiKey.slice(0, 6) + "...";
+    if (shown.token) shown.token = shown.token.slice(0, 6) + "...";
+    if (shown.masterKey) shown.masterKey = shown.masterKey.slice(0, 6) + "...";
+    console.log(chalk.gray(JSON.stringify(shown, null, 2)));
   });
 
 program
@@ -91,28 +101,41 @@ program
 
     try {
       const cfg = getConfig();
-      if (!cfg.masterKey) {
-        spinner.fail("Master key not configured. Run: pwpush config --master-key <hex>");
-        process.exit(1);
+
+      if (options.file) {
+        const fileBuffer = readFileSync(options.file);
+        const name = options.filename || options.file.split("/").pop() || "file";
+        const form = new FormData();
+        form.append("file", new Blob([fileBuffer as any]), name);
+        if (options.passphrase) form.append("passphrase", options.passphrase);
+        if (options.views) form.append("expiryViews", options.views);
+        if (options.days) form.append("expiryDays", options.days);
+        if (options.note) form.append("note", options.note);
+        if (options.email) form.append("retrieverEmail", options.email);
+
+        const data = await apiRequest("/api/v2/files", { method: "POST", body: form });
+        spinner.succeed("File push created!");
+        if (options.quiet) {
+          console.log(data.secretUrl);
+        } else {
+          console.log(chalk.cyan("\nPreview URL:"), data.url);
+          console.log(chalk.cyan("Secret URL:"), data.secretUrl);
+          console.log(chalk.gray(`File: ${data.filename} (${data.size} bytes)`));
+          console.log(chalk.gray(`Views: ${data.views}/${data.maxViews || "∞"}`));
+          console.log(chalk.gray(`Expires: ${data.expiresAt || "Never"}`));
+          if (data.hasPassphrase) console.log(chalk.yellow("Passphrase protected"));
+        }
+        return;
       }
 
       let payload = options.payload;
-      let kind: PushKind = options.type as PushKind;
-      let filename = options.filename;
-      let contentType: string | undefined;
-      let size: number | undefined;
+      const kind: PushKind = options.type as PushKind;
+      const filename = options.filename;
+      const contentType: string | undefined = undefined;
+      const size: number | undefined = undefined;
 
-      if (options.file) {
-        kind = "file";
-        const fileBuffer = readFileSync(options.file);
-        payload = fileBuffer.toString("base64");
-        filename = filename || options.file.split("/").pop();
-        contentType = "application/octet-stream";
-        size = fileBuffer.length;
-      }
-
-      if (!payload && !options.file) {
-        spinner.fail("Payload or file required");
+      if (!payload) {
+        spinner.fail("Payload required");
         process.exit(1);
       }
 
@@ -120,8 +143,9 @@ program
         payload = readFileSync(0, "utf-8").trim();
       }
 
-      const masterKey = Buffer.from(cfg.masterKey, "hex");
-      const result = await encrypt(payload!, masterKey);
+      const pushKey = randomBytes(32);
+      const keyFragment = pushKey.toString("base64url");
+      const result = await encryptWithMasterKey(payload!, new Uint8Array(pushKey), "web");
       const encryptedPayload = serializationResult(result);
 
       const input: CreatePushInput = {
@@ -151,10 +175,10 @@ program
       spinner.succeed("Push created!");
 
       if (options.quiet) {
-        console.log(data.secretUrl);
+        console.log(`${data.secretUrl}#k=${keyFragment}`);
       } else {
-        console.log(chalk.cyan("\nPreview URL:"), data.url);
-        console.log(chalk.cyan("Secret URL:"), data.secretUrl);
+        console.log(chalk.cyan("\nPreview URL:"), `${data.url}#k=${keyFragment}`);
+        console.log(chalk.cyan("Secret URL:"), `${data.secretUrl}#k=${keyFragment}`);
         console.log(chalk.gray(`\nType: ${data.kind}`));
         console.log(chalk.gray(`Views: ${data.views}/${data.maxViews || "∞"}`));
         console.log(chalk.gray(`Expires: ${data.expiresAt || "Never"}`));
@@ -170,17 +194,61 @@ program
   .command("view <id>")
   .description("View a push by ID")
   .option("--passphrase <passphrase>", "Passphrase if required")
-  .option("-q, --quiet", "Output only the payload")
+  .option("--key <key>", "Per-push decryption key (base64url, usually in the URL fragment)")
+  .option("-o, --output <path>", "Write file push content to this path")
+  .option("-q, --quiet", "Output only the payload or downloaded path")
   .action(async (id, options) => {
     const spinner = ora("Fetching push...").start();
 
     try {
-      const data = await apiRequest("/api/v2/pushes/" + id, {
+      const keyMatch = /#k=([A-Za-z0-9_-]+)/.exec(id);
+      const idMatch = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i.exec(id);
+      const pushId = idMatch ? idMatch[1] : id;
+      const pushKeyValue = options.key || keyMatch?.[1];
+
+      const data = await apiRequest("/api/v2/pushes/" + pushId, {
         method: "POST",
         body: JSON.stringify({ passphrase: options.passphrase }),
       });
 
+      if (data.kind === "file" && data.downloadUrl) {
+        const cfg = getConfig();
+        const baseUrl = cfg.apiUrl || "https://api.ksecrets.example.com";
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (cfg.apiKey) headers["X-API-Key"] = cfg.apiKey;
+        if (cfg.token) headers["Authorization"] = `Bearer ${cfg.token}`;
+        const fileRes = await fetch(`${baseUrl}${data.downloadUrl}`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ passphrase: options.passphrase }),
+        });
+        if (!fileRes.ok) {
+          const err = await fileRes.json().catch(() => ({} as any));
+          throw new Error(err.error?.message || `Download failed (HTTP ${fileRes.status})`);
+        }
+        const outPath = options.output || data.filename || "download";
+        const buf = Buffer.from(await fileRes.arrayBuffer());
+        writeFileSync(outPath, buf);
+        spinner.succeed(`File downloaded to ${outPath} (${buf.length} bytes)`);
+        if (options.quiet) console.log(outPath);
+        return;
+      }
+
       spinner.succeed("Push retrieved!");
+
+      const cfg = getConfig();
+      if (typeof data.payload === "string" && data.payload.startsWith("{\"c\":")) {
+        const keyBytes = pushKeyValue
+          ? new Uint8Array(Buffer.from(pushKeyValue, "base64url"))
+          : cfg.masterKey
+            ? new Uint8Array(Buffer.from(cfg.masterKey, "hex"))
+            : null;
+        if (!keyBytes) {
+          throw new Error("This push is encrypted. Pass --key or use the full secret URL (with #k=...).");
+        }
+        const decrypted = await decryptWithMasterKey(deserializeResult(data.payload), keyBytes, "web");
+        data.payload = new TextDecoder().decode(decrypted);
+      }
 
       if (options.quiet) {
         console.log(data.payload);
@@ -247,9 +315,17 @@ program
 
     try {
       const { email, password } = options;
-      // In a real implementation, this would call the auth endpoint
-      spinner.succeed("Authentication not yet implemented - use API key for now");
-      console.log(chalk.gray("Configure API key with: pwpush config --key <key>"));
+      const data = await apiRequest("/api/v2/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+      if (!data.accessToken) {
+        spinner.fail(data.mfaRequired ? "MFA is enabled. Use an API key instead." : "Login failed");
+        process.exit(1);
+      }
+      setConfig("token", data.accessToken);
+      spinner.succeed(`Authenticated as ${data.user.email}`);
+      console.log(chalk.gray("Token stored locally. Set the API URL with: ksecrets config --url <url>"));
     } catch (err) {
       spinner.fail(err instanceof Error ? err.message : "Authentication failed");
       process.exit(1);
