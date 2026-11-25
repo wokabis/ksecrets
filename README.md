@@ -80,6 +80,12 @@ The web UI no longer needs a build-time encryption key: every inline push gets a
 
 ## Deploy to Cloudflare
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/wokabis/ksecrets)
+
+The button deploys the API Worker and automatically provisions the D1 database, KV namespace, and R2 bucket using the root `wrangler.toml`. The repository must be public for the button to work. The React UI is a Cloudflare Pages project and is not covered by the button — deploy it separately with the steps below.
+
+Or deploy manually:
+
 ```bash
 # 1. Authenticate
 npx wrangler login
