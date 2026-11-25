@@ -6,8 +6,8 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 NODE_ENV = "production"
 ENVIRONMENT = "production"
-# WEB_URL = "https://ksecrets.example.com"
-# CORS_ORIGINS = "https://ksecrets.example.com"
+WEB_URL = "https://ksecrets.pages.dev"
+CORS_ORIGINS = "https://ksecrets.pages.dev"
 
 [[d1_databases]]
 binding = "DB"
