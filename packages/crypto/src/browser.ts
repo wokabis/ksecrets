@@ -218,7 +218,7 @@ export async function verifyPassword(password: string, storedHash: string): Prom
 export async function generateApiKey(): Promise<{ key: string; hash: string; prefix: string }> {
   const prefix = "ks_";
   const randomBytes = crypto.getRandomValues(new Uint8Array(24));
-  const randomPart = Buffer.from(randomBytes).toString("base64url");
+  const randomPart = encodeBase64(randomBytes);
   const key = `${prefix}${randomPart}`;
   const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key) as any);
   const hashArray = new Uint8Array(hash);
@@ -256,11 +256,15 @@ function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
 }
 
 export function encodeBase64(data: Uint8Array): string {
-  return Buffer.from(data.buffer as ArrayBuffer, data.byteOffset, data.byteLength).toString("base64url");
+  let binary = "";
+  for (const byte of data) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 export function decodeBase64(str: string): Uint8Array {
-  return new Uint8Array(Buffer.from(str, "base64url"));
+  const padded = str.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (str.length % 4)) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
 export function serializationResult(result: EncryptionResult): string {

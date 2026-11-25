@@ -1,5 +1,5 @@
 import { api } from "../lib/api";
-import { hexToBytes } from "../lib/keys";
+import { generatePushKey, fromBase64Url } from "../lib/pushKey";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Shield, Key, FileText, Globe, Eye, Clock, Trash2, Copy, Check, Plus, Loader2, Filter } from "lucide-react";
@@ -29,6 +29,8 @@ export function Dashboard() {
   type Filter = typeof FILTERS[number];
   const [filter, setFilter] = useState<Filter>("all");
   const [copied, setCopied] = useState<string | null>(null);
+  const [createError, setCreateError] = useState("");
+  const [createdLink, setCreatedLink] = useState<{ url: string; secretUrl: string } | null>(null);
 
   const [formData, setFormData] = useState({
     kind: "password" as CreatePushInput["kind"],
@@ -63,38 +65,62 @@ export function Dashboard() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreating(true);
+    setCreateError("");
 
     try {
-      const masterKeyHex = import.meta.env.VITE_MASTER_KEY || "";
-      if (!masterKeyHex) throw new Error("Encryption key not configured");
-
-      const masterKey = hexToBytes(masterKeyHex);
-      const result = await encryptWithMasterKey(formData.payload, masterKey, "web");
+      const keyFragment = generatePushKey();
+      const pushKey = fromBase64Url(keyFragment);
+      const result = await encryptWithMasterKey(formData.payload, pushKey, "web");
       const encryptedPayload = serializationResult(result);
+
+      const body: Record<string, unknown> = {
+        kind: formData.kind,
+        payload: encryptedPayload,
+        expiryViews: formData.expiryViews ? parseInt(formData.expiryViews) : undefined,
+        expiryDays: formData.expiryDays ? parseInt(formData.expiryDays) : undefined,
+      };
+      if (formData.passphrase.trim()) body.passphrase = formData.passphrase;
+      if (formData.filename.trim()) body.filename = formData.filename;
+      if (formData.note.trim()) body.note = formData.note;
+      if (formData.retrieverEmail.trim()) body.retrieverEmail = formData.retrieverEmail;
 
       const res = await api("/api/v2/pushes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          ...formData,
-          payload: encryptedPayload,
-          expiryViews: formData.expiryViews ? parseInt(formData.expiryViews) : undefined,
-          expiryDays: formData.expiryDays ? parseInt(formData.expiryDays) : undefined,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (res.ok) {
         const newPush = await res.json();
-        setPushes((prev) => [newPush, ...prev]);
-        setShowCreate(false);
+        const withKey = {
+          ...newPush,
+          url: `${newPush.url}#k=${keyFragment}`,
+          secretUrl: `${newPush.secretUrl}#k=${keyFragment}`,
+        };
+        setPushes((prev) => [withKey, ...prev]);
+        setCreatedLink({ url: withKey.url, secretUrl: withKey.secretUrl });
+        closeCreate();
         setFormData({ kind: "password", payload: "", passphrase: "", expiryViews: "", expiryDays: "7", filename: "", note: "", retrieverEmail: "" } as typeof formData);
+      } else {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error?.message || body?.message || "Failed to create push");
       }
     } catch (err) {
-      console.error("Failed to create push:", err);
+      setCreateError(err instanceof Error ? err.message : "Failed to create push");
     } finally {
       setCreating(false);
     }
+  };
+
+  const openCreate = () => {
+    setCreateError("");
+    setShowCreate(true);
+  };
+
+  const closeCreate = () => {
+    setCreateError("");
+    setShowCreate(false);
   };
 
   const handleDelete = async (id: string) => {
@@ -136,7 +162,7 @@ export function Dashboard() {
           <Shield className="mx-auto h-16 w-16 text-gray-300 dark:text-gray-600 mb-4" aria-hidden="true" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white">No pushes found</h3>
           <p className="mt-1 text-gray-500 dark:text-gray-400">Create your first secure push to get started</p>
-          <button onClick={() => setShowCreate(true)} className="mt-4 btn-primary">
+          <button onClick={() => openCreate()} className="mt-4 btn-primary">
             Create Push
           </button>
         </div>
@@ -201,11 +227,11 @@ export function Dashboard() {
     if (!showCreate) return null;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowCreate(false)}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => closeCreate()}>
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
           <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Create New Push</h2>
-            <button onClick={() => setShowCreate(false)} className="btn-ghost p-2">✕</button>
+            <button onClick={() => closeCreate()} className="btn-ghost p-2">✕</button>
           </div>
           <form onSubmit={handleCreate} className="p-6 space-y-4">
             <div>
@@ -301,8 +327,14 @@ export function Dashboard() {
               />
             </div>
 
+            {createError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+                {createError}
+              </div>
+            )}
+
             <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary flex-1">Cancel</button>
+              <button type="button" onClick={() => closeCreate()} className="btn-secondary flex-1">Cancel</button>
               <button type="submit" className="btn-primary flex-1" disabled={creating || !formData.payload.trim()}>
                 {creating ? "Creating..." : "Create Push"}
               </button>
@@ -320,11 +352,35 @@ export function Dashboard() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
           <p className="mt-1 text-gray-600 dark:text-gray-300">Manage your secure pushes</p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
+        <button onClick={() => openCreate()} className="btn-primary flex items-center gap-2">
           <Plus className="h-4 w-4" aria-hidden="true" />
           New Push
         </button>
       </div>
+
+      {createdLink && (
+        <div className="card mb-6 border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                Push created. Copy the secret link now — the key is not stored.
+              </p>
+              <input
+                readOnly
+                value={createdLink.secretUrl}
+                className="input mt-2 font-mono text-xs"
+                onFocus={(e) => e.target.select()}
+              />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => copyUrl(createdLink.secretUrl, "created")} className="btn-secondary">
+                {copied === "created" ? "Copied" : "Copy link"}
+              </button>
+              <button onClick={() => setCreatedLink(null)} className="btn-ghost">Dismiss</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="card overflow-hidden">
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
