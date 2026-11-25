@@ -108,11 +108,13 @@ npx wrangler d1 execute ksecrets-db --remote --file=./schema.sql   # or let the 
 
 # 6. Deploy
 pnpm deploy:api
-pnpm --filter @ksecrets/web build   # set VITE_API_URL for the Pages build
+pnpm --filter @ksecrets/web build
 pnpm deploy:web
 ```
 
 Schema initialization is idempotent and runs automatically on the first API request (`CREATE TABLE IF NOT EXISTS` plus settings seeds).
+
+The UI talks to the API **same-origin** through a Pages Function (`apps/web/functions/api/[[path]].js`), which proxies `/api/*` to the Worker — this keeps auth cookies first-party and avoids cross-site cookie issues. Before deploying the UI, point it at your Worker by editing `DEFAULT_API_ORIGIN` in that file (or set an `API_ORIGIN` env var on the Pages project). Setting `VITE_API_URL` at build time is only needed if you want the browser bundle to call a remote API directly instead.
 
 ### GitHub Actions
 
@@ -120,10 +122,10 @@ CI (lint, typecheck, tests, builds) runs on every push and PR and needs no secre
 
 Deployment jobs are **disabled by default**. To enable them, set repository variable `ENABLE_DEPLOY=true` plus:
 
-- Secrets: `CLOUDFLARE_API_TOKEN`, `SECRET_KEY_BASE`, `KSECRETS_MASTER_KEY`
-- Variables: `CF_ACCOUNT_ID`, `D1_DATABASE_ID`, `KV_NAMESPACE_ID`, `VITE_API_URL`
+- Secret: `CLOUDFLARE_API_TOKEN` (needs Workers, Pages, D1, KV, and R2 permissions)
+- Variables: `CF_ACCOUNT_ID`, `D1_DATABASE_ID`, `KV_NAMESPACE_ID`; `VITE_API_URL` only if the bundle should bypass the same-origin proxy
 
-The deploy workflow patches the D1/KV IDs into `wrangler.toml` before deploying. Without a Cloudflare token with Workers, Pages, D1, KV, and R2 permissions, leave `ENABLE_DEPLOY` unset — the pipeline stays green and skips deployment.
+The deploy workflow patches the D1/KV IDs into `wrangler.toml` before deploying. Worker secrets (`SECRET_KEY_BASE`, `KSECRETS_MASTER_KEY`) are set once with `wrangler secret put` and survive deploys, so they are not needed as GitHub secrets. Without a token, leave `ENABLE_DEPLOY` unset — the pipeline stays green and skips deployment.
 
 ## Security model
 
