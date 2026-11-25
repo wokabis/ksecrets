@@ -143,11 +143,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download API artifact
-        uses: actions/download-artifact@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          name: api-dist
-          path: apps/api/dist/
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      # The Worker bundles workspace packages from source, so the deploy job
+      # needs the full dependency tree (the prebuilt artifact would skip it).
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Configure Cloudflare resources
         if: vars.ENABLE_DEPLOY == 'true'
